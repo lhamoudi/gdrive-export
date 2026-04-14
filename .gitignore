@@ -1,0 +1,7 @@
+node_modules/
+.venv/
+nyl-sync-all-workbooks.sh
+
+# OAuth token — never commit credentials
+token.json
+credentials.json
