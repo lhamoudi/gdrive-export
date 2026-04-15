@@ -219,15 +219,41 @@ async function exportAndUpload(sourceId, folderId, { appendTimestamp, filename, 
     process.exit(1);
   }
 
-  // Upload to target folder.
+  // Check for an existing file with the same name in the target folder.
+  let existingId = null;
+  try {
+    const { data } = await drive.files.list({
+      q: `name = ${JSON.stringify(exportName)} and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id)',
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+    });
+    existingId = data.files[0]?.id ?? null;
+  } catch (err) {
+    console.error(`Failed to check for existing file: ${err.message}`);
+    process.exit(1);
+  }
+
+  // Upload to target folder — overwrite if a file with the same name exists.
   let uploaded;
   try {
-    ({ data: uploaded } = await drive.files.create({
-      requestBody: { name: exportName, parents: [folderId] },
-      media: { mimeType: exportMime, body: Readable.from(exportData) },
-      fields: 'id,name,webViewLink',
-      supportsAllDrives: true,
-    }));
+    if (existingId) {
+      console.log(`Overwriting existing file (id=${existingId})…`);
+      ({ data: uploaded } = await drive.files.update({
+        fileId: existingId,
+        requestBody: { name: exportName },
+        media: { mimeType: exportMime, body: Readable.from(exportData) },
+        fields: 'id,name,webViewLink',
+        supportsAllDrives: true,
+      }));
+    } else {
+      ({ data: uploaded } = await drive.files.create({
+        requestBody: { name: exportName, parents: [folderId] },
+        media: { mimeType: exportMime, body: Readable.from(exportData) },
+        fields: 'id,name,webViewLink',
+        supportsAllDrives: true,
+      }));
+    }
   } catch (err) {
     console.error(`Upload failed: ${err.message}`);
     process.exit(1);
